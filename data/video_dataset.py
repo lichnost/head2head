@@ -3,10 +3,12 @@ import random
 import torch
 import numpy as np
 import torchvision
+import cv2
 from PIL import Image
 from data.base_dataset import BaseDataset, get_params, get_transform, get_video_parameters
 from data.image_folder import make_video_dataset, assert_valid_pairs
 from data.landmarks_to_image import create_eyes_image
+from util import util
 
 class videoDataset(BaseDataset):
     def initialize(self, opt):

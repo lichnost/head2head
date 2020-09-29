@@ -67,6 +67,8 @@ class Head2HeadModelD(BaseModel):
         self.criterionGAN = networks.GANLoss(opt.gan_mode, tensor=self.Tensor)
         self.criterionWarp = networks.MaskedL1Loss()
         self.criterionFeat = torch.nn.L1Loss()
+        self.criterionGP = networks.GPLoss()
+        self.criterionCP = networks.CPLoss()
         if not opt.no_vgg:
             self.criterionVGG = networks.VGGLoss(self.gpu_ids[0])
 
@@ -76,6 +78,10 @@ class Head2HeadModelD(BaseModel):
             self.loss_names += ['Gm_GAN', 'Gm_GAN_Feat', 'Dm_real', 'Dm_fake']
         if opt.use_eyes_D:
             self.loss_names += ['Ge_GAN', 'Ge_GAN_Feat', 'De_real', 'De_fake']
+        if not opt.no_profg:
+            self.loss_names += ['G_ProfG']
+        if not opt.no_profc:
+            self.loss_names += ['G_ProfC']
 
         beta1, beta2 = opt.beta1, 0.999
         lr = opt.lr
@@ -144,6 +150,8 @@ class Head2HeadModelD(BaseModel):
         is_temporal_D = D_T_scale != 0
         lambda_feat = self.opt.lambda_feat
         lambda_warp = self.opt.lambda_warp
+        lambda_profg = self.opt.lambda_profg
+        lambda_profc = self.opt.lambda_profc
         tD = self.opt.n_frames_D
 
         if is_temporal_D:
@@ -186,7 +194,14 @@ class Head2HeadModelD(BaseModel):
                 loss_Ge_GAN *= eyes_weight
                 loss_Ge_GAN_Feat *= eyes_weight
                 loss_list += [loss_Ge_GAN, loss_Ge_GAN_Feat, loss_De_real, loss_De_fake]
-
+            if not self.opt.no_profg:
+                loss_profg = self.criterionGP(fake_B, real_B)
+                loss_profg *= lambda_profg
+                loss_list += [loss_profg]
+            if not self.opt.no_profc:
+                loss_profc = self.criterionGP(fake_B, real_B)
+                loss_profg *= lambda_profc
+                loss_list += [loss_profc]
             loss_list = [loss.unsqueeze(0) for loss in loss_list]
             return loss_list
 

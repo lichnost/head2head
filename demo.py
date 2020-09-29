@@ -200,6 +200,7 @@ def main():
     proccesses = []
 
     # Face tracker / detector
+    box_redecect_nframes = opt.box_redetect_nframes
     box = None # Face bounding box, calculated by first frame
 
     # Face reconstructor / NMFC renderer
@@ -231,6 +232,19 @@ def main():
     proccesses.append(proccess_video_renderer)
     print('Launced video renderer!')
 
+    camera = None
+    if opt.realtime:
+        try:
+            import pyfakewebcam
+            stream_id = opt.realtime_cam_id
+            webcam_width = webcam_height = opt.loadSize
+            camera = pyfakewebcam.FakeWebcam(f'/dev/video{stream_id}', webcam_width, webcam_height)
+            camera.print_capabilities()
+            print(f'Fake webcam created on /dev/video{stream_id}.')
+        except Exception as ex:
+            print('Fake webcam initialization failed:')
+            print(str(ex))
+
     iter = 0
     # Start main Process (Face reconstruction / NMFC renderering)
     while True:
@@ -243,14 +257,20 @@ def main():
             if opt.demo_dir is not None:
                 result_path = os.path.join(opt.demo_dir, "{:06d}".format(iter) + '.png')
                 cv2.imwrite(result_path, result)
+            elif camera is not None:
+                camera.schedule_frame(fake_frame)
             else:
                 cv2.imshow(window_name, result)
+                cv2.waitKey(1)
         except queue.Empty: # If empty queue continue.
             pass
         # Read next frame
         _, frame = video_capture.read()
         # Crop the larger dimension of frame to make it square
         frame = make_frame_square(frame)
+
+        if box_redecect_nframes > 0 and iter % box_redecect_nframes == 0:
+            box = None
         # If no bounding box has been detected yet, run MTCNN (once in first frame)
         if box is None:
             box = detect_box(detector, frame)

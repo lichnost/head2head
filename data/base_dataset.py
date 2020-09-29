@@ -2,8 +2,8 @@ import torch.utils.data as data
 import torch
 from PIL import Image
 import torchvision.transforms as transforms
+import torchvision.transforms.functional as F
 import numpy as np
-import random
 
 class BaseDataset(data.Dataset):
     def __init__(self):
@@ -56,6 +56,13 @@ def get_params(opt, size):
         new_w = w
     return {'new_size': (new_w, new_h), 'ratio':(new_h / h, new_w / w)}
 
+class CustomAffineTransform(object):
+    def __init__(self, params):
+        self.params = params
+
+    def __call__(self, img):
+        return F.affine(img, *self.params, False, 0)
+
 def get_transform(opt, params, method=Image.BICUBIC, normalize=True, augment=False, toTensor=True):
     transform_list = []
     ### resize input image
@@ -66,9 +73,28 @@ def get_transform(opt, params, method=Image.BICUBIC, normalize=True, augment=Fal
         transform_list.append(transforms.Lambda(lambda img: __scale(img, params['new_size'], method)))
 
     if augment:
-        transform_list += [transforms.RandomAffine(degrees=(0, 0),
-                                                   translate=(0.01, 0.01),
-                                                   scale=(0.99, 1.01))]
+        degrees = (0, 0)
+        translate = (0.02, 0.02)
+        scale_ranges = (0.98, 1.02)
+        angle = np.random.uniform(degrees[0], degrees[1])
+        if translate is not None:
+            max_dx = translate[0] * opt.loadSize
+            max_dy = translate[1] * opt.loadSize
+            translations = (np.round(np.random.uniform(-max_dx, max_dx)),
+                            np.round(np.random.uniform(-max_dy, max_dy)))
+        else:
+            translations = (0, 0)
+
+        if scale_ranges is not None:
+            scale = np.random.uniform(scale_ranges[0], scale_ranges[1])
+        else:
+            scale = 1.0
+
+        shear = 0.0
+
+        params = angle, translations, scale, shear
+
+        transform_list += [CustomAffineTransform(params)]
     if toTensor:
         transform_list += [transforms.ToTensor()]
     if normalize:

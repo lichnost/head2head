@@ -10,6 +10,7 @@ from data.data_loader import CreateDataLoader
 from models.models import create_model
 import util.util as util
 from util.visualizer import Visualizer
+import cv2
 
 opt = TrainOptions().parse()
 n_frames_G, n_frames_D = opt.n_frames_G, opt.n_frames_D
@@ -121,6 +122,10 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             if opt.use_eyes_D:
                 loss_G += loss_dict['Ge_GAN'] + loss_dict['Ge_GAN_Feat']
                 loss_D += (loss_dict['De_fake'] + loss_dict['De_real']) * 0.5
+            if not opt.no_profg:
+                loss_G += loss_dict['G_ProfG']
+            if not opt.no_profc:
+                loss_G += loss_dict['G_ProfC']
             loss_D_T = []
             actual_t_scales = min(t_scales, len(loss_dict_T))
             for s in range(actual_t_scales):

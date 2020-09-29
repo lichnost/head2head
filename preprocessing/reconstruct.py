@@ -160,7 +160,7 @@ def main():
                 print('(%d/%d) %s [SUCCESS]' % (n_completed, n_image_dirs, name))
             else:
                 # If the 3D reconstruction not successful, remove images and video.
-                remove_images(name, image_pths)
+                # TODO remove_images(name, image_pths)
                 print('(%d/%d) %s [FAILED]' % (n_completed, n_image_dirs, name))
         else:
             print('(%d/%d) %s already processed!' % (n_completed, n_image_dirs, name))

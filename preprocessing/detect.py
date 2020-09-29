@@ -10,6 +10,7 @@ from facenet_pytorch import MTCNN, extract_face
 import matplotlib.pyplot as plt
 import collections
 from tqdm import tqdm
+from preprocessing.cdvd_tsp.model.cdvd_tsp import CDVD_TSP
 
 VID_EXTENSIONS = ['.mp4']
 
@@ -173,24 +174,61 @@ def get_faces(detector, images, box, args):
     # Crop face regions.
     if stat:
         print('Extracting faces')
-        for img in tqdm(all_imgs, total=len(all_imgs)):
-            face = extract_face(img, avg_box, args.cropped_image_size, args.margin)
-            ret_faces.append(face)
+        for margin in args.margin:
+            print('For margin: %s' % margin)
+            for img in tqdm(all_imgs, total=len(all_imgs)):
+                face = extract_face(img, avg_box, args.cropped_image_size, margin)
+                ret_faces.append(face)
     return stat, ret_faces, avg_box
 
-def detect_and_save_faces(detector, name, mp4_paths, split, args):
+def detect_and_save_faces(detector, name, mp4_paths, split, args, deblur_net, device):
     start_i = 0
     box = None
     for n, mp4_path in enumerate(mp4_paths):
         is_last = n == len(mp4_paths) - 1
         images, fps = read_mp4(mp4_path, args)
+
         stat, face_images, box = get_faces(detector, images, box, args)
+
+        if args.deblur:
+            face_images = deblur_images(deblur_net, face_images, device)
+
         if stat:
             save_images(tensor2npimage(face_images), name, split, start_i, is_last, args)
-            start_i += len(images)
+            start_i += len(face_images)
         else:
             return False
     return stat
+
+
+def deblur_images(deblur_net, images, device):
+
+    def numpy2tensor(input_seq, rgb_range=1.):
+        tensor_list = []
+        for img in input_seq:
+            img = np.array(img).astype('float64')
+            # np_transpose = np.ascontiguousarray(img.transpose((2, 0, 1)))  # HWC -> CHW
+            tensor = torch.from_numpy(img).float()  # numpy -> tensor
+            tensor.mul_(rgb_range / 255)  # (0,255) -> (0,1)
+            tensor_list.append(tensor)
+        stacked = torch.stack(tensor_list).unsqueeze(0)
+        return stacked
+
+    addit_num = deblur_net.n_sequence // 2
+    addit_start = images[:addit_num]
+    addit_start.reverse()
+    addit_end = images[-addit_num:]
+    addit_end.reverse()
+    images_to_deblur = addit_start + images + addit_end
+
+    print('Debluring images')
+    result = []
+    for i in tqdm(range(len(images))):
+        input = numpy2tensor(images_to_deblur[i:i + 1 + addit_num * 2])
+        input = input.to(device)
+        _, _, _, out, _ = deblur_net(input)
+        result.append(out.detach().cpu())
+    return images
 
 def print_args(parser, args):
     message = ''
@@ -212,9 +250,9 @@ def main():
     parser.add_argument('--original_videos_path', type=str, default='datasets/head2headDataset/original_videos',
                         help='Path of video data dir.')
     parser.add_argument('--dataset_name', type=str, default='head2headDataset', help='Path to save dataset.')
-    parser.add_argument('--mtcnn_batch_size', default=8, type=int, help='The number of frames for face detection.')
+    parser.add_argument('--mtcnn_batch_size', default=32, type=int, help='The number of frames for face detection.')
     parser.add_argument('--cropped_image_size', default=256, type=int, help='The size of frames after cropping the face.')
-    parser.add_argument('--margin', default=100, type=int, help='.')
+    parser.add_argument('--margin', default=[130, 115, 100, 85, 70], type=int, nargs='+', help='.')
     parser.add_argument('--dst_threshold', default=0.3, type=float, help='Max L_inf distance between any bounding boxes in a video. (normalised by image size: (h+w)/2)')
     parser.add_argument('--window_length', default=99, type=int, help='savgol filter window length.')
     parser.add_argument('--polyorder', default=3, type=int, help='savgol filter polyorder.')
@@ -223,6 +261,7 @@ def main():
     parser.add_argument('--test_seq_ratio', default=0.33, type=int, help='The ratio of frames left for test (self-reenactment)')
     parser.add_argument('--split', default='train', choices=['train', 'test'], type=str, help='The split for data [train|test]')
     parser.add_argument('--n_replicate_first', default=0, type=int, help='How many times to replicate and append the first frame to the beginning of the video.')
+    parser.add_argument('--deblur', action='store_true', default=True, help='Deblur video sequnce before detect')
 
     args = parser.parse_args()
     print_args(parser, args)
@@ -247,15 +286,24 @@ def main():
     n_mp4s = len(mp4_paths_dict)
     print('Number of videos to process: %d \n' % n_mp4s)
 
+    if args.deblur:
+        deblur_net = CDVD_TSP(
+            in_channels=3, n_sequence=5, out_channels=3, n_resblock=3, n_feat=32,
+            is_mask_filter=True, device=device
+        )
+        deblur_net.load_state_dict(torch.load('./preprocessing/models/CDVD_TSP_DVD_Convergent.pt'), strict=False)
+        deblur_net = deblur_net.to(device)
+        deblur_net.eval()
+
     # Initialize the MTCNN face  detector.
-    detector = MTCNN(image_size=args.cropped_image_size, margin=args.margin, post_process=False, device=device)
+    detector = MTCNN(image_size=args.cropped_image_size, margin=args.margin[0], post_process=False, device=device)
 
     # Run detection
     n_completed = 0
     for name, path in mp4_paths_dict.items():
         n_completed += 1
         if not is_video_path_processed(name, args.split, args):
-            success = detect_and_save_faces(detector, name, path, args.split, args)
+            success = detect_and_save_faces(detector, name, path, args.split, args, deblur_net, device)
             if success:
                 print('(%d/%d) %s (%s file) [SUCCESS]' % (n_completed, n_mp4s, path[0], args.split))
             else:

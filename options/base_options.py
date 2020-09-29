@@ -13,7 +13,7 @@ class BaseOptions():
         self.parser.add_argument('--no_augment_input', action='store_true', help='if true, do not perform input data augmentation.')
         self.parser.add_argument('--ROI_size', type=int, default=72, help='spatial dimension size of ROI (mouth or eyes).')
         self.parser.add_argument('--no_mouth_D', action='store_true', help='if true, do not use mouth discriminator')
-        self.parser.add_argument('--use_eyes_D', action='store_true', help='if true, Use eyes discriminator')
+        self.parser.add_argument('--use_eyes_D', action='store_true', default=True, help='if true, Use eyes discriminator')
         self.parser.add_argument('--no_eye_gaze', action='store_true', help='if true, the model does not condition synthesis on eye gaze images')
         self.parser.add_argument('--use_faceflow', action='store_true', default=True, help='if true, Use fine-tuned flow on faces.')
         self.parser.add_argument('--n_frames_G', type=int, default=3, help='number of input frames to feed into generator, i.e., n_frames_G-1 is the number of frames we look into past')

@@ -9,5 +9,5 @@ python demo.py --checkpoints_dir checkpoints/$dataset_name \
                --name head2head_$target_name \
                --dataroot datasets/$dataset_name/dataset \
                --do_reenactment \
-               --gpu_ids 0,1 \
-               --demo_dir results_demo # Comment this line out for camera demo.
+               --gpu_ids 0 \
+               #--demo_dir results_demo # Comment this line out for camera demo.

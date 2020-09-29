@@ -186,3 +186,4 @@ https://anaconda.org/anaconda/scikit-image/0.16.2/download/linux-64/scikit-image
 https://anaconda.org/conda-forge/flatbuffers/1.10.0/download/linux-64/flatbuffers-1.10.0-hfc679d8_0.tar.bz2
 https://anaconda.org/conda-forge/python-flatbuffers/1.10/download/noarch/python-flatbuffers-1.10-py_0.tar.bz2
 https://anaconda.org/conda-forge/pydub/0.23.1/download/noarch/pydub-0.23.1-py_0.tar.bz2
+https://anaconda.org/conda-forge/cupy/7.8.0/download/linux-64/cupy-7.8.0-py37h940342b_1.tar.bz2
