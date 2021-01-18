@@ -178,6 +178,19 @@ def get_faces(detector, images, box, args):
             print('For margin: %s' % margin)
             for img in tqdm(all_imgs, total=len(all_imgs)):
                 face = extract_face(img, avg_box, args.cropped_image_size, margin)
+                # TODO fix
+                margin = [
+                    margin * (box[2] - box[0]) / (args.cropped_image_size - margin),
+                    margin * (box[3] - box[1]) / (args.cropped_image_size - margin),
+                ]
+                raw_image_size = img.size
+                box = [
+                    int(max(box[0] - margin[0] / 2, 0)),
+                    int(max(box[1] - margin[1] / 2, 0)),
+                    int(min(box[2] + margin[0] / 2, raw_image_size[0])),
+                    int(min(box[3] + margin[1] / 2, raw_image_size[1])),
+                ]
+
                 ret_faces.append(face)
     return stat, ret_faces, avg_box
 
@@ -261,7 +274,7 @@ def main():
     parser.add_argument('--test_seq_ratio', default=0.33, type=int, help='The ratio of frames left for test (self-reenactment)')
     parser.add_argument('--split', default='train', choices=['train', 'test'], type=str, help='The split for data [train|test]')
     parser.add_argument('--n_replicate_first', default=0, type=int, help='How many times to replicate and append the first frame to the beginning of the video.')
-    parser.add_argument('--deblur', action='store_true', default=True, help='Deblur video sequnce before detect')
+    parser.add_argument('--deblur', action='store_true', default=False, help='Deblur video sequnce before detect')
 
     args = parser.parse_args()
     print_args(parser, args)
@@ -286,6 +299,7 @@ def main():
     n_mp4s = len(mp4_paths_dict)
     print('Number of videos to process: %d \n' % n_mp4s)
 
+    deblur_net = None
     if args.deblur:
         deblur_net = CDVD_TSP(
             in_channels=3, n_sequence=5, out_channels=3, n_resblock=3, n_feat=32,
